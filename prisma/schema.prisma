@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  name          String?
+  image         String?
+  
+  // OAuth IDs
+  discordId     String?   @unique
+  githubId      Int?      @unique
+  
+  // Gamification
+  xp            Int       @default(0)
+  streak        Int       @default(0)
+  badges        String[]  @default([])
+  
+  // Relations
+  profile       Profile?
+  contributions Contribution[]
+  roleMappings  RoleMapping[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Profile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  username      String?   @unique
+  bio           String?
+  avatarUrl     String?
+  displayName   String?
+  
+  // Stats
+  totalCommits  Int       @default(0)
+  totalPRs      Int       @default(0)
+  totalIssues   Int       @default(0)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Repo {
+  id            String    @id @default(cuid())
+  owner         String
+  name          String
+  fullName      String    @unique
+  description   String?
+  url           String?
+  
+  // GitHub Data
+  githubId      Int?
+  defaultBranch String?   @default("main")
+  
+  // Settings
+  settings      Json      @default("{}")
+  webhookSecret String?
+  isActive      Boolean   @default(true)
+  autoSummarize Boolean   @default(true)
+  
+  // Relations
+  contributions Contribution[]
+  prs           PullRequest[]
+  issues        GithubIssue[]
+  webhookLogs   WebhookLog[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([owner, name])
+}
+
+model Contribution {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  repoId      String
+  repo        Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  
+  // Stats
+  commits     Int       @default(0)
+  prs         Int       @default(0)
+  issues      Int       @default(0)
+  xpAwarded   Int       @default(0)
+  
+  lastActive  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([userId, repoId])
+}
+
+model PullRequest {
+  id                String    @id @default(cuid())
+  repoId            String
+  repo              Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  
+  prNumber          Int
+  title             String
+  body              String?
+  author            String
+  url               String
+  state             String    @default("open")
+  
+  // AI Data
+  aiSummary         String?
+  changes           Int       @default(0)
+  
+  // Discord
+  discordThreadId   String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([repoId, prNumber])
+}
+
+model GithubIssue {
+  id                String    @id @default(cuid())
+  repoId            String
+  repo              Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  
+  issueNumber       Int
+  title             String
+  body              String?
+  author            String
+  url               String
+  state             String    @default("open")
+  labels            String[]  @default([])
+  
+  // AI Data
+  aiSummary         String?
+  aiCategory        String?
+  
+  // Discord
+  discordMessageId  String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([repoId, issueNumber])
+}
+
+model DiscordServer {
+  id            String    @id @default(cuid())
+  guildId       String    @unique
+  guildName     String
+  botToken      String
+  isActive      Boolean   @default(true)
+  
+  // Relations
+  channels      DiscordChannel[]
+  roleMappings  RoleMapping[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model DiscordChannel {
+  id                String    @id @default(cuid())
+  serverId          String
+  server            DiscordServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  
+  channelId         String
+  channelName       String
+  channelType       String    @default("text")
+  
+  // Notifications
+  notificationType  String[]  @default(["pr", "issue", "push"])
+  
+  createdAt         DateTime  @default(now())
+  
+  @@unique([serverId, channelId])
+}
+
+model RoleMapping {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  serverId      String
+  server        DiscordServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  
+  discordRole   String
+  githubTeam    String
+  permissions   Json      @default("{}")
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model WebhookLog {
+  id            String    @id @default(cuid())
+  repoId        String
+  repo          Repo      @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  
+  eventType     String
+  eventData     Json
+  responseData  Json?
+  status        String    @default("pending")
+  error         String?
+  
+  createdAt     DateTime  @default(now())
+}
+
+model Job {
+  id            String    @id @default(cuid())
+  type          String
+  status        String    @default("pending")
+  
+  // Data
+  data          Json
+  result        Json?
+  error         String?
+  
+  // Retry
+  retryCount    Int       @default(0)
+  maxRetries    Int       @default(3)
+  
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+}
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  eventType     String
+  action        String
+  payload       Json
+  
+  createdAt     DateTime  @default(now())
+}
+
+model Leaderboard {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  
+  rank          Int       @default(0)
+  xpTotal       Int       @default(0)
+  prCount       Int       @default(0)
+  reviewCount   Int       @default(0)
+  bugCount      Int       @default(0)
+  
+  updatedAt     DateTime  @updatedAt
+}
