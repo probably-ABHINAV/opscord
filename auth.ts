@@ -4,6 +4,7 @@ import Discord from "next-auth/providers/discord"
 import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
+import authConfig from "@/auth.config"
 
 const providers = []
 
@@ -48,8 +49,12 @@ if (providers.length === 0) {
   )
 }
 
-export const { handlers, auth, signIn, signOut} = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers,
+  session: {
+    strategy: "jwt",
+  },
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
@@ -68,8 +73,11 @@ export const { handlers, auth, signIn, signOut} = NextAuth({
       return session
     },
     async signIn({ user, account, profile }) {
+      if (typeof window !== 'undefined') {
+        return true
+      }
+      
       try {
-        // Get or create user in database
         let dbUser = await prisma.user.findUnique({
           where: { email: user.email || "" },
         })
@@ -93,7 +101,6 @@ export const { handlers, auth, signIn, signOut} = NextAuth({
             include: { profile: true },
           })
         } else {
-          // Update provider IDs
           if (account?.provider === "discord" && profile?.id) {
             await prisma.user.update({
               where: { id: dbUser.id },
@@ -115,9 +122,4 @@ export const { handlers, auth, signIn, signOut} = NextAuth({
       }
     },
   },
-  pages: {
-    signIn: "/auth/login",
-    signUp: "/auth/sign-up",
-  },
-  trustHost: true,
 })
