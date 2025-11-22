@@ -1,4 +1,5 @@
 import { exchangeCodeForToken, getUserData } from "@/lib/github"
+import { getServiceSupabase } from "@/lib/supabase"
 import { cookies } from "next/headers"
 import type { NextRequest } from "next/server"
 
@@ -26,6 +27,22 @@ export async function GET(request: NextRequest) {
 
     const token = await exchangeCodeForToken(code, clientId, clientSecret)
     const userData = await getUserData(token)
+
+    // Upsert user to Supabase (create new or update existing placeholder)
+    const supabase = getServiceSupabase()
+    await supabase.from('users').upsert(
+      {
+        github_id: userData.id.toString(),
+        username: userData.login,
+        avatar_url: userData.avatar_url,
+        name: userData.name || userData.login,
+        email: userData.email,
+        github_token: token,
+      },
+      {
+        onConflict: 'github_id', // Update existing record if github_id already exists
+      }
+    )
 
     const cookieStore = await cookies()
     cookieStore.set("github_token", token, {

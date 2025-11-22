@@ -4,10 +4,14 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { motion } from "framer-motion"
 import RepoCard from "./repo-card"
 import DiscordConfig from "./discord-config"
-import { LogOut, Github, MessageCircle, Gauge } from "lucide-react"
+import ActivityFeed from "./activity-feed"
+import Leaderboard from "./leaderboard"
+import UserBadges from "./user-badges"
+import { LogOut, Github, MessageCircle, Gauge, Activity, Trophy, Award, Settings } from "lucide-react"
 
 interface Repo {
   id: number
@@ -144,9 +148,9 @@ export default function Dashboard({ user }: DashboardProps) {
       </motion.header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <motion.div className="space-y-12" variants={containerVariants} initial="hidden" animate="visible">
-          {/* Stats */}
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          {/* Stats Overview */}
+          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {[
               { label: "Repositories", value: repos.length, icon: Github, color: "from-primary" },
               {
@@ -184,49 +188,85 @@ export default function Dashboard({ user }: DashboardProps) {
             ))}
           </motion.div>
 
-          {/* Discord Config */}
+          {/* Main Content Tabs */}
           <motion.div variants={itemVariants}>
-            <DiscordConfig
-              onConnected={() => {
-                setDiscordConnected(true)
-                checkDiscordStatus()
-              }}
-            />
-          </motion.div>
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4 mb-8">
+                <TabsTrigger value="overview" className="gap-2">
+                  <Github className="w-4 h-4" />
+                  <span className="hidden sm:inline">Overview</span>
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="gap-2">
+                  <Activity className="w-4 h-4" />
+                  <span className="hidden sm:inline">Activity</span>
+                </TabsTrigger>
+                <TabsTrigger value="analytics" className="gap-2">
+                  <Trophy className="w-4 h-4" />
+                  <span className="hidden sm:inline">Analytics</span>
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </TabsTrigger>
+              </TabsList>
 
-          {/* Repositories */}
-          <motion.div variants={itemVariants} className="space-y-6">
-            <motion.h2
-              className="text-3xl font-bold text-foreground"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              Your Repositories
-            </motion.h2>
+              <TabsContent value="overview" className="space-y-6">
+                <h2 className="text-3xl font-bold text-foreground">Your Repositories</h2>
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <Spinner />
+                  </div>
+                ) : repos.length === 0 ? (
+                  <Card className="p-12 text-center border-border/30 bg-card/40">
+                    <p className="text-muted-foreground">No repositories found</p>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {repos.map((repo) => (
+                      <RepoCard key={repo.id} repo={repo} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
 
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Spinner />
-              </div>
-            ) : repos.length === 0 ? (
-              <Card className="p-12 text-center border-border/30 bg-card/40">
-                <p className="text-muted-foreground">No repositories found</p>
-              </Card>
-            ) : (
-              <motion.div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {repos.map((repo, idx) => (
-                  <motion.div key={repo.id} variants={itemVariants}>
-                    <RepoCard repo={repo} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
+              <TabsContent value="activity" className="space-y-6">
+                <h2 className="text-3xl font-bold text-foreground">Activity Timeline</h2>
+                <p className="text-muted-foreground">Track your recent contributions and events</p>
+                <ActivityFeed />
+              </TabsContent>
+
+              <TabsContent value="analytics" className="space-y-8">
+                <div>
+                  <h2 className="text-3xl font-bold text-foreground mb-6">Team Analytics</h2>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-yellow-500" />
+                        Leaderboard
+                      </h3>
+                      <Leaderboard />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-primary" />
+                        Your Progress
+                      </h3>
+                      <UserBadges userId={user.login} />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="settings" className="space-y-6">
+                <h2 className="text-3xl font-bold text-foreground">Settings</h2>
+                <DiscordConfig
+                  onConnected={() => {
+                    setDiscordConnected(true)
+                    checkDiscordStatus()
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
           </motion.div>
         </motion.div>
       </main>
